@@ -386,17 +386,53 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
   });
 
   /* ---------- 複製結果 ---------- */
+  // 備援複製法：Clipboard API 在非安全環境或部分聊天室內嵌瀏覽器可能被拒絕，
+  // 此時改用隱藏 textarea + execCommand('copy') 確保仍可複製成功
+  function fallbackCopy(text){
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
   document.getElementById('copyBtn').addEventListener('click', async ()=>{
     if(!lastResult) return;
-    const lines = [`Split Tools Result (${currencySelect.value})`, `Total: ${fmt(lastResult.total)}   Per person: ${fmt(lastResult.share)}`, ''];
-    lastResult.transactions.forEach(t=> lines.push(`${t.from} → ${t.to}: ${fmt(t.amount)}`));
-    if(lastResult.transactions.length===0) lines.push('Everyone paid the same amount — no transfers needed.');
+    const lines = [`Split Tools Result (${currencySelect.value})`, `Total Spent: ${fmt(lastResult.total)}`, ''];
+    lines.push('Paid:');
+    lastResult.balances.forEach(b=> lines.push(`  ${b.name}: ${fmt(b.paid)}`));
+    lines.push('');
+    if(lastResult.transactions.length===0){
+      lines.push('Transfers: none — everyone paid the same amount.');
+    } else {
+      lines.push('Transfers:');
+      lastResult.transactions.forEach(t=> lines.push(`  ${t.from} → ${t.to}: ${fmt(t.amount)}`));
+    }
+    const text = lines.join('\n');
+
+    let copied = false;
     try{
-      await navigator.clipboard.writeText(lines.join('\n'));
-      const btn = document.getElementById('copyBtn');
+      if(navigator.clipboard && window.isSecureContext){
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    }catch(e){ copied = false; }
+    if(!copied){ copied = fallbackCopy(text); }
+
+    const btn = document.getElementById('copyBtn');
+    if(copied){
       const old = btn.textContent; btn.textContent = 'Copied ✓';
       setTimeout(()=> btn.textContent = old, 1500);
-    }catch(e){ showError('Copy failed — please select and copy the text manually.'); }
+    } else {
+      showError('Copy failed — please select and copy the text manually.');
+    }
   });
 
   /* ---------- 歷史記錄（localStorage） ---------- */

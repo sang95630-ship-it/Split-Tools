@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>食飯分帳計算機</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== TOKENS（沿用 Tokyo_Jul2026 設計語言） ===== */
+:root,[data-theme="light"]{
+  --text-xs:clamp(.75rem,.7rem + .25vw,.875rem);
+  --text-sm:clamp(.875rem,.8rem + .35vw,1rem);
+  --text-base:clamp(1rem,.95rem + .25vw,1.125rem);
+  --text-lg:clamp(1.125rem,1rem + .75vw,1.5rem);
+  --text-xl:clamp(1.5rem,1.2rem + 1.25vw,2.25rem);
+  --space-1:.25rem;--space-2:.5rem;--space-3:.75rem;--space-4:1rem;
+  --space-5:1.25rem;--space-6:1.5rem;--space-8:2rem;--space-10:2.5rem;
+  --color-bg:#eef2f4;--color-surface:#f5f8f9;--color-surface-2:#fbfcfd;
+  --color-surface-offset:#dfe7ea;
+  --color-divider:#d3dee2;--color-border:#c2d0d5;
+  --color-text:#28343a;--color-text-muted:#5f7178;--color-text-faint:#8fa0a6;
+  --color-text-inverse:#f7fbfc;
+  --color-primary:#3f6e7a;--color-primary-hover:#325963;
+  --color-primary-highlight:#d7e6e9;
+  --color-danger:#a24444;--color-danger-highlight:#f3dcdc;
+  --color-credit:#3f7a55;--color-credit-highlight:#dcefe2;
+  --shadow-sm:0 1px 3px rgba(20,40,48,.08);
+  --shadow-md:0 8px 28px rgba(20,40,48,.10);
+  --radius-sm:.5rem;--radius-md:.8rem;--radius-lg:1.2rem;--radius-full:9999px;
+  --font-display:'Noto Serif TC',serif;
+  --font-body:'Manrope','Noto Sans TC',sans-serif;
+}
+[data-theme="dark"]{
+  --color-bg:#161d20;--color-surface:#1c2528;--color-surface-2:#222c2f;
+  --color-surface-offset:#2a3539;
+  --color-divider:#37454a;--color-border:#46565b;
+  --color-text:#e7eff1;--color-text-muted:#b0c1c6;--color-text-faint:#7d9096;
+  --color-text-inverse:#16201f;
+  --color-primary:#9fd0da;--color-primary-hover:#bfe2ea;
+  --color-primary-highlight:#2c4247;
+  --color-danger:#e2a3a3;--color-danger-highlight:#3a2626;
+  --color-credit:#9edcae;--color-credit-highlight:#213a29;
+  --shadow-md:0 8px 28px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-body);font-size:var(--text-base);line-height:1.65;
+  background:var(--color-bg);color:var(--color-text);transition:background .3s,color .3s}
+button{border:none;background:none;cursor:pointer;color:inherit;font:inherit}
+input,select{font:inherit;color:inherit}
+
+.site-header{position:sticky;top:0;z-index:30;display:flex;align-items:center;
+  justify-content:space-between;padding:var(--space-4) var(--space-6);
+  background:color-mix(in srgb,var(--color-bg) 86%,transparent);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--color-divider)}
+.brand-text{font-family:var(--font-display);font-size:var(--text-lg);font-weight:700}
+.brand-sub{display:block;font-size:var(--text-xs);color:var(--color-text-muted);font-weight:400}
+.theme-btn{width:42px;height:42px;border-radius:var(--radius-full);display:grid;place-items:center;
+  background:var(--color-surface);border:1px solid var(--color-border)}
+.theme-btn:hover{background:var(--color-surface-offset)}
+
+main{max-width:640px;margin:0 auto;padding:var(--space-6) var(--space-4) var(--space-10)}
+
+.card{background:var(--color-surface);border:1px solid var(--color-divider);
+  border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);
+  padding:var(--space-6);margin-bottom:var(--space-6)}
+.card h2{font-family:var(--font-display);font-size:var(--text-lg);margin:0 0 var(--space-4)}
+.card h3{font-size:var(--text-base);margin:var(--space-5) 0 var(--space-3);color:var(--color-text-muted)}
+
+.field-row{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3)}
+.field-row label{font-size:var(--text-sm);color:var(--color-text-muted);min-width:3.6rem}
+select,.amount-input,.name-input{
+  padding:.55rem .75rem;border:1px solid var(--color-border);border-radius:var(--radius-sm);
+  background:var(--color-surface-2);color:var(--color-text)}
+select{flex:0 0 auto}
+
+.person-row{display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)}
+.name-input{flex:1 1 auto;min-width:0}
+.amount-input{width:7.5rem}
+.remove-btn{width:36px;height:36px;flex:0 0 auto;border-radius:var(--radius-sm);
+  color:var(--color-danger);font-size:1.1rem;display:grid;place-items:center}
+.remove-btn:hover{background:var(--color-danger-highlight)}
+
+.add-btn{margin-top:var(--space-2);padding:.6rem 1rem;border-radius:var(--radius-sm);
+  border:1px dashed var(--color-border);color:var(--color-primary);font-weight:600;width:100%}
+.add-btn:hover{background:var(--color-primary-highlight);border-color:var(--color-primary)}
+
+.primary-btn{margin-top:var(--space-5);padding:.85rem 1.2rem;border-radius:var(--radius-sm);
+  background:var(--color-primary);color:var(--color-text-inverse);font-weight:700;width:100%;
+  font-size:var(--text-base)}
+.primary-btn:hover{background:var(--color-primary-hover)}
+.ghost-btn{padding:.6rem 1rem;border-radius:var(--radius-sm);border:1px solid var(--color-border);
+  color:var(--color-text-muted);font-weight:600;font-size:var(--text-sm)}
+.ghost-btn:hover{background:var(--color-surface-offset)}
+
+.error-msg{color:var(--color-danger);font-size:var(--text-sm);margin-top:var(--space-2);min-height:1.2em}
+
+.summary-row{display:flex;justify-content:space-between;padding:var(--space-2) 0;
+  border-bottom:1px solid var(--color-divider);font-size:var(--text-sm)}
+.summary-row:last-child{border-bottom:none}
+.summary-row b{font-size:var(--text-base)}
+
+table.balance-table{width:100%;border-collapse:collapse;margin-top:var(--space-3);font-size:var(--text-sm)}
+table.balance-table th{text-align:left;color:var(--color-text-muted);font-weight:600;
+  padding:var(--space-2);border-bottom:1px solid var(--color-divider)}
+table.balance-table td{padding:var(--space-2);border-bottom:1px solid var(--color-divider)}
+.amt-pos{color:var(--color-credit);font-weight:700}
+.amt-neg{color:var(--color-danger);font-weight:700}
+
+.tx-list{list-style:none;margin:0;padding:0}
+.tx-item{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3);
+  background:var(--color-surface-2);border-radius:var(--radius-md);margin-bottom:var(--space-2);
+  font-size:var(--text-sm)}
+.tx-item .arrow{color:var(--color-text-faint)}
+.tx-item .tx-amount{margin-left:auto;font-weight:700;color:var(--color-primary)}
+.tx-note{font-size:var(--text-xs);color:var(--color-text-faint);margin-top:var(--space-2)}
+
+.history-item{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);
+  border:1px solid var(--color-divider);border-radius:var(--radius-md);margin-bottom:var(--space-2)}
+.history-item .h-meta{flex:1 1 auto;font-size:var(--text-sm)}
+.history-item .h-meta small{display:block;color:var(--color-text-faint);font-size:var(--text-xs)}
+.history-empty{color:var(--color-text-faint);font-size:var(--text-sm)}
+.history-actions{display:flex;gap:var(--space-2)}
+.icon-btn{width:32px;height:32px;border-radius:var(--radius-sm);display:grid;place-items:center;
+  color:var(--color-text-muted)}
+.icon-btn:hover{background:var(--color-surface-offset)}
+
+.hidden{display:none !important}
+footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
+  color:var(--color-text-faint);font-size:var(--text-xs);text-align:center}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">
+    <span class="brand-text">食飯分帳計算機
+      <span class="brand-sub">最少轉帳次數結算</span>
+    </span>
+  </div>
+  <button class="theme-btn" id="themeToggle" aria-label="切換深色模式" title="切換深色模式">
+    <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+  </button>
+</header>
+
+<main>
+
+  <section class="card">
+    <h2>① 人員與支出</h2>
+    <div class="field-row">
+      <label for="currencySelect">貨幣</label>
+      <select id="currencySelect"></select>
+    </div>
+
+    <div id="peopleList"></div>
+    <button class="add-btn" id="addPersonBtn">＋ 新增人員</button>
+
+    <button class="primary-btn" id="calcBtn">計算分帳</button>
+    <div class="error-msg" id="formError"></div>
+  </section>
+
+  <section class="card hidden" id="resultSection">
+    <h2>② 結算結果</h2>
+    <div id="summaryBox"></div>
+
+    <h3>每人應付／應收</h3>
+    <table class="balance-table">
+      <thead><tr><th>姓名</th><th>已付</th><th>結餘</th></tr></thead>
+      <tbody id="balanceBody"></tbody>
+    </table>
+
+    <h3 id="txHeading">建議轉帳</h3>
+    <ul class="tx-list" id="txList"></ul>
+    <div class="tx-note" id="txNote"></div>
+
+    <div class="field-row" style="margin-top:var(--space-4)">
+      <button class="ghost-btn" id="copyBtn">複製結果文字</button>
+      <button class="ghost-btn" id="saveBtn">儲存到歷史記錄</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>歷史記錄</h2>
+    <div id="historyList"></div>
+    <button class="ghost-btn hidden" id="clearHistoryBtn" style="margin-top:var(--space-3)">清空全部記錄</button>
+  </section>
+
+</main>
+
+<footer>金額四捨五入至分（0.01），總額無法整除人數時，結餘總和可能有 ±0.01 的捨入差異。</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- 主題切換 ---------- */
+  const root = document.documentElement;
+  const themeToggle = document.getElementById('themeToggle');
+  function applyTheme(t){ root.setAttribute('data-theme', t); localStorage.setItem('billSplit_theme', t); }
+  applyTheme(localStorage.getItem('billSplit_theme') || 'light');
+  themeToggle.addEventListener('click', () => {
+    applyTheme(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+  });
+
+  /* ---------- 貨幣 ---------- */
+  const CURRENCIES = [
+    {code:'HKD', label:'港幣 HKD', symbol:'HK$'},
+    {code:'USD', label:'美元 USD', symbol:'US$'},
+    {code:'CNY', label:'人民幣 CNY', symbol:'¥'},
+    {code:'JPY', label:'日圓 JPY', symbol:'¥'},
+    {code:'EUR', label:'歐元 EUR', symbol:'€'},
+    {code:'GBP', label:'英鎊 GBP', symbol:'£'},
+    {code:'TWD', label:'新台幣 TWD', symbol:'NT$'},
+    {code:'SGD', label:'新加坡元 SGD', symbol:'S$'},
+    {code:'KRW', label:'韓圜 KRW', symbol:'₩'},
+    {code:'AUD', label:'澳元 AUD', symbol:'A$'},
+    {code:'MOP', label:'澳門幣 MOP', symbol:'MOP$'}
+  ];
+  const currencySelect = document.getElementById('currencySelect');
+  CURRENCIES.forEach(c=>{
+    const opt = document.createElement('option');
+    opt.value = c.code; opt.textContent = c.label;
+    currencySelect.appendChild(opt);
+  });
+  currencySelect.value = 'HKD';
+  function currentSymbol(){
+    return (CURRENCIES.find(c=>c.code===currencySelect.value)||{}).symbol || '$';
+  }
+  function fmt(n){
+    return currentSymbol() + n.toLocaleString('zh-Hant-HK',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+
+  /* ---------- 人員列表 ---------- */
+  let people = [];   // {id, name, amount}
+  let uid = 0;
+  function newPerson(name='', amount=''){ return {id:++uid, name, amount}; }
+  people = [newPerson(), newPerson(), newPerson()];
+
+  const peopleList = document.getElementById('peopleList');
+  function renderPeople(){
+    peopleList.innerHTML = '';
+    people.forEach(p=>{
+      const row = document.createElement('div');
+      row.className = 'person-row';
+      row.innerHTML = `
+        <input class="name-input" type="text" placeholder="姓名" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name">
+        <input class="amount-input" type="number" placeholder="金額" min="0" step="0.01" value="${p.amount}" data-id="${p.id}" data-field="amount">
+        <button class="remove-btn" data-id="${p.id}" title="移除" aria-label="移除">×</button>
+      `;
+      peopleList.appendChild(row);
+    });
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  peopleList.addEventListener('input', e=>{
+    const id = +e.target.dataset.id, field = e.target.dataset.field;
+    const p = people.find(p=>p.id===id);
+    if(!p) return;
+    p[field] = field==='amount' ? e.target.value : e.target.value;
+  });
+  peopleList.addEventListener('click', e=>{
+    const btn = e.target.closest('.remove-btn');
+    if(!btn) return;
+    const id = +btn.dataset.id;
+    if(people.length <= 2){ showError('至少需要 2 位人員。'); return; }
+    people = people.filter(p=>p.id!==id);
+    renderPeople();
+  });
+  document.getElementById('addPersonBtn').addEventListener('click', ()=>{
+    people.push(newPerson());
+    renderPeople();
+  });
+  renderPeople();
+
+  /* ---------- 驗證 ---------- */
+  const formError = document.getElementById('formError');
+  function showError(msg){ formError.textContent = msg; }
+  function clearError(){ formError.textContent = ''; }
+
+  function validate(){
+    if(people.length < 2){ return '至少需要 2 位人員。'; }
+    const names = new Set();
+    for(const p of people){
+      const name = (p.name||'').trim();
+      if(!name){ return '所有人員都必須填寫姓名。'; }
+      if(names.has(name)){ return `姓名「${name}」重複，請改用不同名稱區分。`; }
+      names.add(name);
+      const amt = parseFloat(p.amount);
+      if(p.amount==='' || isNaN(amt) || amt < 0){ return `「${name}」的金額必須是 0 或以上的數字。`; }
+    }
+    return null;
+  }
+
+  /* ---------- 貪婪演算法：最少轉帳次數結算 ---------- */
+  function calculateSettlement(list){
+    const total = list.reduce((s,p)=>s + parseFloat(p.amount), 0);
+    const share = total / list.length;
+    const balances = list.map(p=>({
+      name: p.name.trim(),
+      paid: +parseFloat(p.amount).toFixed(2),
+      balance: +(parseFloat(p.amount) - share).toFixed(2)
+    }));
+
+    const EPS = 0.005;
+    let creditors = balances.filter(b=>b.balance > EPS).map(b=>({name:b.name, amt:b.balance}));
+    let debtors   = balances.filter(b=>b.balance < -EPS).map(b=>({name:b.name, amt:-b.balance}));
+    creditors.sort((a,b)=>b.amt-a.amt);
+    debtors.sort((a,b)=>b.amt-a.amt);
+
+    const transactions = [];
+    let i=0, j=0;
+    while(i<debtors.length && j<creditors.length){
+      const pay = Math.min(debtors[i].amt, creditors[j].amt);
+      if(pay > EPS){
+        transactions.push({from:debtors[i].name, to:creditors[j].name, amount:+pay.toFixed(2)});
+      }
+      debtors[i].amt -= pay;
+      creditors[j].amt -= pay;
+      if(debtors[i].amt <= EPS) i++;
+      if(creditors[j].amt <= EPS) j++;
+    }
+    return {total:+total.toFixed(2), share:+share.toFixed(2), balances, transactions};
+  }
+
+  /* ---------- 結果顯示 ---------- */
+  const resultSection = document.getElementById('resultSection');
+  const summaryBox = document.getElementById('summaryBox');
+  const balanceBody = document.getElementById('balanceBody');
+  const txList = document.getElementById('txList');
+  const txHeading = document.getElementById('txHeading');
+  const txNote = document.getElementById('txNote');
+  let lastResult = null;
+
+  function renderResult(res){
+    lastResult = res;
+    summaryBox.innerHTML = `
+      <div class="summary-row"><span>總支出</span><b>${fmt(res.total)}</b></div>
+      <div class="summary-row"><span>人均份額（${res.balances.length} 人）</span><b>${fmt(res.share)}</b></div>
+    `;
+    balanceBody.innerHTML = res.balances.map(b=>`
+      <tr>
+        <td>${escapeHtml(b.name)}</td>
+        <td>${fmt(b.paid)}</td>
+        <td class="${b.balance>0.005?'amt-pos':(b.balance<-0.005?'amt-neg':'')}">
+          ${b.balance>0.005?'應收 ':(b.balance<-0.005?'應付 ':'')}${fmt(Math.abs(b.balance))}
+        </td>
+      </tr>`).join('');
+
+    txHeading.textContent = `建議轉帳（共 ${res.transactions.length} 筆）`;
+    if(res.transactions.length === 0){
+      txList.innerHTML = '<li class="history-empty">大家支出相同，毋須轉帳。</li>';
+      txNote.textContent = '';
+    } else {
+      txList.innerHTML = res.transactions.map(t=>`
+        <li class="tx-item">
+          <span>${escapeHtml(t.from)}</span><span class="arrow">→</span><span>${escapeHtml(t.to)}</span>
+          <span class="tx-amount">${fmt(t.amount)}</span>
+        </li>`).join('');
+      txNote.textContent = '';
+    }
+    resultSection.classList.remove('hidden');
+    resultSection.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  document.getElementById('calcBtn').addEventListener('click', ()=>{
+    clearError();
+    const err = validate();
+    if(err){ showError(err); return; }
+    const res = calculateSettlement(people);
+    renderResult(res);
+  });
+
+  /* ---------- 複製結果 ---------- */
+  document.getElementById('copyBtn').addEventListener('click', async ()=>{
+    if(!lastResult) return;
+    const lines = [`食飯分帳結果（${currencySelect.value}）`, `總支出：${fmt(lastResult.total)}　人均：${fmt(lastResult.share)}`, ''];
+    lastResult.transactions.forEach(t=> lines.push(`${t.from} → ${t.to}：${fmt(t.amount)}`));
+    if(lastResult.transactions.length===0) lines.push('大家支出相同，毋須轉帳。');
+    try{
+      await navigator.clipboard.writeText(lines.join('\n'));
+      const btn = document.getElementById('copyBtn');
+      const old = btn.textContent; btn.textContent = '已複製 ✓';
+      setTimeout(()=> btn.textContent = old, 1500);
+    }catch(e){ showError('複製失敗，請手動選取文字複製。'); }
+  });
+
+  /* ---------- 歷史記錄（localStorage） ---------- */
+  const HISTORY_KEY = 'billSplit_history';
+  const historyList = document.getElementById('historyList');
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+  function loadHistory(){
+    try{ return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+    catch(e){ return []; }
+  }
+  function saveHistoryList(list){ localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); }
+
+  function renderHistory(){
+    const list = loadHistory();
+    if(list.length===0){
+      historyList.innerHTML = '<div class="history-empty">尚未儲存任何記錄。</div>';
+      clearHistoryBtn.classList.add('hidden');
+      return;
+    }
+    clearHistoryBtn.classList.remove('hidden');
+    historyList.innerHTML = '';
+    list.slice().reverse().forEach(rec=>{
+      const sym = (CURRENCIES.find(c=>c.code===rec.currency)||{}).symbol || '$';
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.innerHTML = `
+        <div class="h-meta">
+          ${rec.people.length} 人・總額 ${sym}${rec.total.toFixed(2)}・${rec.transactions.length} 筆轉帳
+          <small>${new Date(rec.savedAt).toLocaleString('zh-Hant-HK')}</small>
+        </div>
+        <div class="history-actions">
+          <button class="icon-btn" data-action="load" data-id="${rec.id}" title="載入">↺</button>
+          <button class="icon-btn" data-action="delete" data-id="${rec.id}" title="刪除">🗑</button>
+        </div>`;
+      historyList.appendChild(div);
+    });
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', ()=>{
+    if(!lastResult) return;
+    const list = loadHistory();
+    list.push({
+      id: Date.now(),
+      savedAt: new Date().toISOString(),
+      currency: currencySelect.value,
+      people: people.map(p=>({name:p.name.trim(), amount:+parseFloat(p.amount).toFixed(2)})),
+      total: lastResult.total,
+      share: lastResult.share,
+      transactions: lastResult.transactions
+    });
+    saveHistoryList(list);
+    renderHistory();
+    const btn = document.getElementById('saveBtn');
+    const old = btn.textContent; btn.textContent = '已儲存 ✓';
+    setTimeout(()=> btn.textContent = old, 1500);
+  });
+
+  historyList.addEventListener('click', e=>{
+    const btn = e.target.closest('.icon-btn');
+    if(!btn) return;
+    const id = +btn.dataset.id;
+    const list = loadHistory();
+    const rec = list.find(r=>r.id===id);
+    if(!rec) return;
+    if(btn.dataset.action === 'delete'){
+      saveHistoryList(list.filter(r=>r.id!==id));
+      renderHistory();
+    } else if(btn.dataset.action === 'load'){
+      currencySelect.value = rec.currency;
+      people = rec.people.map(p=> newPerson(p.name, p.amount));
+      renderPeople();
+      const res = calculateSettlement(people);
+      renderResult(res);
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+  });
+
+  clearHistoryBtn.addEventListener('click', ()=>{
+    if(!confirm('確定要清空全部歷史記錄嗎？此操作無法復原。')) return;
+    saveHistoryList([]);
+    renderHistory();
+  });
+
+  renderHistory();
+})();
+</script>
+</body>
+</html>

@@ -243,12 +243,12 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
   const peopleList = document.getElementById('peopleList');
   function renderPeople(){
     peopleList.innerHTML = '';
-    people.forEach(p=>{
+    people.forEach((p,idx)=>{
       const row = document.createElement('div');
       row.className = 'person-row';
       row.innerHTML = `
-        <input class="name-input" type="text" placeholder="Name" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name">
-        <input class="amount-input" type="number" placeholder="Amount" min="0" step="0.01" value="${p.amount}" data-id="${p.id}" data-field="amount">
+        <input class="name-input" type="text" placeholder="Person ${idx+1}" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name">
+        <input class="amount-input" type="number" placeholder="0" min="0" step="0.01" value="${p.amount===0?'':p.amount}" data-id="${p.id}" data-field="amount">
         <button class="remove-btn" data-id="${p.id}" title="Remove" aria-label="Remove">×</button>
       `;
       peopleList.appendChild(row);
@@ -281,6 +281,12 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
   function showError(msg){ formError.textContent = msg; }
   function clearError(){ formError.textContent = ''; }
 
+  // 留空的金額視為 $0（不強制輸入），僅需保證輸入的內容本身是合法數字
+  function parseAmt(v){
+    const s = (v===undefined || v===null) ? '' : String(v).trim();
+    return s==='' ? 0 : parseFloat(s);
+  }
+
   function validate(){
     if(people.length < 2){ return 'At least 2 people are required.'; }
     const names = new Set();
@@ -289,20 +295,20 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
       if(!name){ return 'Every person must have a name.'; }
       if(names.has(name)){ return `The name "${name}" is duplicated. Please use a different name.`; }
       names.add(name);
-      const amt = parseFloat(p.amount);
-      if(p.amount==='' || isNaN(amt) || amt < 0){ return `"${name}"'s amount must be a number of 0 or more.`; }
+      const amt = parseAmt(p.amount);
+      if(isNaN(amt) || amt < 0){ return `"${name}"'s amount must be a number of 0 or more.`; }
     }
     return null;
   }
 
   /* ---------- 貪婪演算法：最少轉帳次數結算 ---------- */
   function calculateSettlement(list){
-    const total = list.reduce((s,p)=>s + parseFloat(p.amount), 0);
+    const total = list.reduce((s,p)=>s + parseAmt(p.amount), 0);
     const share = total / list.length;
     const balances = list.map(p=>({
       name: p.name.trim(),
-      paid: +parseFloat(p.amount).toFixed(2),
-      balance: +(parseFloat(p.amount) - share).toFixed(2)
+      paid: +parseAmt(p.amount).toFixed(2),
+      balance: +(parseAmt(p.amount) - share).toFixed(2)
     }));
 
     const EPS = 0.005;
@@ -368,6 +374,11 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
 
   document.getElementById('calcBtn').addEventListener('click', ()=>{
     clearError();
+    // 姓名留空時，依欄位順序自動寫入 "Person X"（非僅提示文字）
+    people.forEach((p,idx)=>{
+      if(!(p.name||'').trim()) p.name = `Person ${idx+1}`;
+    });
+    renderPeople();
     const err = validate();
     if(err){ showError(err); return; }
     const res = calculateSettlement(people);
@@ -432,7 +443,7 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
       id: Date.now(),
       savedAt: new Date().toISOString(),
       currency: currencySelect.value,
-      people: people.map(p=>({name:p.name.trim(), amount:+parseFloat(p.amount).toFixed(2)})),
+      people: people.map(p=>({name:p.name.trim(), amount:+parseAmt(p.amount).toFixed(2)})),
       total: lastResult.total,
       share: lastResult.share,
       transactions: lastResult.transactions

@@ -76,8 +76,17 @@ select,.amount-input,.name-input{
 select{flex:0 0 auto}
 
 .person-row{display:flex;gap:var(--space-2);align-items:center;margin-bottom:var(--space-2)}
-.name-input{flex:1 1 auto;min-width:0}
-.amount-input{width:7.5rem}
+.field-wrap{position:relative;display:flex;align-items:center}
+.field-wrap.name-wrap{flex:1 1 auto;min-width:0}
+.field-wrap.amount-wrap{flex:0 0 auto}
+.name-input{width:100%;padding-right:1.9rem}
+.amount-input{width:7.5rem;padding-right:1.9rem;-moz-appearance:textfield}
+.amount-input::-webkit-outer-spin-button,
+.amount-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.clear-field-btn{position:absolute;right:.3rem;top:50%;transform:translateY(-50%);
+  width:22px;height:22px;border-radius:var(--radius-full);display:grid;place-items:center;
+  color:var(--color-text-faint);font-size:1rem;line-height:1}
+.clear-field-btn:hover{background:var(--color-surface-offset);color:var(--color-danger)}
 .remove-btn{width:36px;height:36px;flex:0 0 auto;border-radius:var(--radius-sm);
   color:var(--color-danger);font-size:1.1rem;display:grid;place-items:center}
 .remove-btn:hover{background:var(--color-danger-highlight)}
@@ -247,8 +256,14 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
       const row = document.createElement('div');
       row.className = 'person-row';
       row.innerHTML = `
-        <input class="name-input" type="text" placeholder="Person ${idx+1}" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name">
-        <input class="amount-input" type="number" placeholder="0" min="0" step="0.01" value="${p.amount===0?'':p.amount}" data-id="${p.id}" data-field="amount">
+        <div class="field-wrap name-wrap">
+          <input class="name-input" type="text" placeholder="Person ${idx+1}" value="${escapeHtml(p.name)}" data-id="${p.id}" data-field="name" enterkeyhint="next">
+          <button type="button" class="clear-field-btn" data-id="${p.id}" data-field="name" title="Clear name" aria-label="Clear name">×</button>
+        </div>
+        <div class="field-wrap amount-wrap">
+          <input class="amount-input" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" value="${p.amount===0?'':p.amount}" data-id="${p.id}" data-field="amount" enterkeyhint="next">
+          <button type="button" class="clear-field-btn" data-id="${p.id}" data-field="amount" title="Clear amount" aria-label="Clear amount">×</button>
+        </div>
         <button class="remove-btn" data-id="${p.id}" title="Remove" aria-label="Remove">×</button>
       `;
       peopleList.appendChild(row);
@@ -263,12 +278,46 @@ footer{max-width:640px;margin:0 auto;padding:0 var(--space-4) var(--space-8);
     p[field] = field==='amount' ? e.target.value : e.target.value;
   });
   peopleList.addEventListener('click', e=>{
+    const clearBtn = e.target.closest('.clear-field-btn');
+    if(clearBtn){
+      const id = +clearBtn.dataset.id, field = clearBtn.dataset.field;
+      const p = people.find(p=>p.id===id);
+      if(p){
+        p[field] = '';
+        renderPeople();
+        const input = peopleList.querySelector(`.${field==='name'?'name-input':'amount-input'}[data-id="${id}"]`);
+        if(input) input.focus();
+      }
+      return;
+    }
     const btn = e.target.closest('.remove-btn');
     if(!btn) return;
     const id = +btn.dataset.id;
     if(people.length <= 2){ showError('At least 2 people are required.'); return; }
     people = people.filter(p=>p.id!==id);
     renderPeople();
+  });
+  // 手機/桌面按 Enter 鍵時跳到下一格：姓名 → 同列金額 → 下一位姓名（最後一列自動新增一位）
+  peopleList.addEventListener('keydown', e=>{
+    if(e.key !== 'Enter') return;
+    const field = e.target.dataset.field;
+    if(!field) return;
+    e.preventDefault();
+    const id = +e.target.dataset.id;
+    if(field === 'name'){
+      const amtInput = peopleList.querySelector(`.amount-input[data-id="${id}"]`);
+      if(amtInput) amtInput.focus();
+    } else if(field === 'amount'){
+      const idx = people.findIndex(p=>p.id===id);
+      let nextPerson = people[idx+1];
+      if(!nextPerson){
+        nextPerson = newPerson();
+        people.push(nextPerson);
+        renderPeople();
+      }
+      const nextInput = peopleList.querySelector(`.name-input[data-id="${nextPerson.id}"]`);
+      if(nextInput) nextInput.focus();
+    }
   });
   document.getElementById('addPersonBtn').addEventListener('click', ()=>{
     people.push(newPerson());
